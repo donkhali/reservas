@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Reservas Pro - DinamicRes</title>
+    <title>Sistema de Reservas Pro - RestoPub</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -18,7 +18,7 @@
         <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-2">
                 <i class="fa-solid fa-utensils text-emerald-500 text-2xl"></i>
-                <span class="text-xl font-bold tracking-wider text-white">RestoPub <span class="text-emerald-400 text-xs font-normal">Live DB v1.84</span></span>
+                <span class="text-xl font-bold tracking-wider text-white">RestoPub <span class="text-emerald-400 text-xs font-normal">Live DB v2.0</span></span>
             </div>
             <!-- Estado de la Conexión -->
             <div id="db-status" class="text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-full">
@@ -70,7 +70,7 @@
                         <span class="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[10px] normal-case"><i class="fa-solid fa-calendar-day mr-1"></i>Filtro de Fecha Activo</span>
                     </label>
                     <div id="plano-cliente" class="bg-gray-950 rounded-xl p-4 border border-gray-700 grid grid-cols-2 gap-3 text-center min-h-[150px] items-center justify-center">
-                        <!-- JS inyectará las mesas libres o el bloqueo por falta de evento -->
+                        <!-- JS inyectará las mesas libres o bloqueo por falta de evento -->
                     </div>
                 </div>
 
@@ -228,6 +228,10 @@
                     <label class="block text-xs text-gray-400 mb-1">Notas Especiales</label>
                     <textarea id="res-notas" rows="2" placeholder="Cumpleaños, detalles..." class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none resize-none"></textarea>
                 </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Notas Especiales</label>
+                    <textarea id="res-notas" rows="2" placeholder="Cumpleaños, detalles..." class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none resize-none"></textarea>
+                </div>
                 <div class="p-3 bg-gray-900/50 rounded-lg border border-gray-700/60 text-xs text-gray-300">
                     Vas a reservar la mesa: <span id="resumen-mesa-id" class="text-emerald-400 font-bold"></span>
                 </div>
@@ -246,9 +250,9 @@
         const CLAVE_ADMIN = "admin123";
         let activeView = "cliente"; 
 
-        // === CREDENCIALES DE SUPABASE ===
-        const SUPABASE_URL = "TU_SUPABASE_URL"; 
-        const SUPABASE_ANON_KEY = "TU_SUPABASE_ANON_KEY";
+        // === CREDENCIALES DE SUPABASE AGREGADAS EN SU LUGAR ===
+        const SUPABASE_URL = "https://ucjtnkmmtyumcujbapgc.supabase.co"; // Sin el /rest/v1/ al final
+        const SUPABASE_ANON_KEY = "tu_clave_publishable_default...";
         
         let db = null;
         let modoLocal = true;
@@ -291,7 +295,7 @@
         let mesaSeleccionada = null;
         let eventoActualCliente = "Noche Regular (Abierto)";
 
-        // POSICIONAR CALENDARIO EN LA PRIMERA FECHA CRONOLÓGICA CON EVENTOS
+        // POSICIONAR CALENDARIO EN LA PRIMERA FECHA CON EVENTOS
         window.onload = async () => {
             const eventos = await getEventos();
             if (eventos && eventos.length > 0) {
@@ -393,7 +397,7 @@
             cargarEcosistemaData();
         }
 
-        // === RENDERIZADO VISUAL CON EXPLICITACIÓN DE ZONA EN TARJETA CLIENTE ===
+        // === RENDERIZADO: PANEL CLIENTE ===
         function renderPlanoCliente(mesas, reservas, eventos) {
             const fechaSeleccionada = document.getElementById('client-date').value;
             const contenedor = document.getElementById('plano-cliente');
@@ -433,7 +437,6 @@
                 btn.className = `p-4 bg-emerald-500 text-gray-950 hover:bg-emerald-400 active:scale-95 font-bold rounded-xl text-sm flex flex-col items-center justify-center shadow-lg border border-emerald-400/30 transition-all duration-150`;
                 btn.onclick = () => selectMesaCliente(m.numero, m.capacidad);
                 
-                // Renderizado completo: Identificador de la mesa, Zona física y Capacidad de personas
                 btn.innerHTML = `
                     <span class="text-base tracking-wider leading-none">${m.numero}</span>
                     <span class="text-[9px] uppercase font-bold tracking-wide text-emerald-950/70 truncate max-w-[130px] mt-0.5 mb-1.5" title="${m.zona}">${m.zona}</span>
@@ -489,7 +492,7 @@
             cargarEcosistemaData();
         }
 
-        // === RENDERIZADO: APARTADO DE ANFITRIÓN ===
+        // === RENDERIZADO: PANEL ANFITRIÓN ===
         function renderAnfitrionView(mesas, reservas) {
             const fechaFiltroAnfitrion = document.getElementById('anfitrion-date').value;
             const lista = document.getElementById('lista-reservas-anfitrion');
