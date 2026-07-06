@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Reservas Pro - Dinamicas</title>
+    <title>Sistema de Reservas Pro - RestoPub</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -18,7 +18,7 @@
         <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-2">
                 <i class="fa-solid fa-utensils text-emerald-500 text-2xl"></i>
-                <span class="text-xl font-bold tracking-wider text-white">RestoPub <span class="text-emerald-400 text-xs font-normal">Live DB v1.8</span></span>
+                <span class="text-xl font-bold tracking-wider text-white">RestoPub <span class="text-emerald-400 text-xs font-normal">Live DB v1.81</span></span>
             </div>
             <!-- Estado de la Conexión -->
             <div id="db-status" class="text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-full">
@@ -100,11 +100,11 @@
                 </div>
             </div>
 
-            <!-- Monitor de Piso Interactivo -->
+            <!-- Monitor de Piso Interactivo (Vista Configurada Especial) -->
             <div class="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-map-location-dot text-emerald-400 mr-2"></i>Monitor de Piso (Vista Táctil)</h3>
-                    <div class="text-[11px] text-gray-400 italic"><i class="fa-solid fa-pointer mr-1"></i>Haz clic en una mesa ocupada para liberarla inmediatamente</div>
+                    <div class="text-[11px] text-gray-400 italic"><i class="fa-solid fa-shield-halved mr-1"></i>Doble confirmación de seguridad activa para liberación</div>
                 </div>
                 <div id="plano-anfitrion" class="bg-gray-950 border border-gray-700 rounded-xl p-6 grid grid-cols-2 sm:grid-cols-3 gap-4 flex-1 content-start">
                     <!-- JS renderizará el estado dinámico de la sala según la fecha elegida -->
@@ -244,7 +244,7 @@
         // === CONTROLES DE ACCESO / CLAVES DEL SISTEMA ===
         const CLAVE_ANFITRION = "1234";
         const CLAVE_ADMIN = "admin123";
-        let activeView = "cliente"; // Rastrear vista actual para fallbacks de denegación
+        let activeView = "cliente"; 
 
         // === CREDENCIALES DE SUPABASE ===
         const SUPABASE_URL = "TU_SUPABASE_URL"; 
@@ -257,7 +257,7 @@
             try {
                 db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 modoLocal = false;
-                document.getElementById('db-status').className = "text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-full";
+                document.getElementById('db-status').className = "text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full";
                 document.getElementById('db-status').innerHTML = '<i class="fa-solid fa-cloud shadow-sm mr-1"></i> Conectado a Supabase';
             } catch (error) {
                 console.error("Error en conexión Supabase, usando localStorage fallback:", error);
@@ -352,27 +352,17 @@
             }
         }
 
-        // CONTROLADOR DE CAMBIO DE ENTORNOS CON VERIFICACIÓN DE CLAVES
         function switchView(viewId) {
-            // Validar clave para Anfitrión
             if (viewId === 'anfitrion') {
                 let pass = prompt("Ingrese la clave de seguridad para el entorno de Anfitrión:");
-                if (pass !== CLAVE_ANFITRION) {
-                    alert("Llave incorrecta. Acceso denegado.");
-                    return; // Aborta la operación y se queda en la pantalla actual
-                }
+                if (pass !== CLAVE_ANFITRION) { alert("Llave incorrecta. Acceso denegado."); return; }
             }
-
-            // Validar clave para Administrador
             if (viewId === 'admin') {
                 let pass = prompt("Ingrese la clave de seguridad de Administrador (CRUD):");
-                if (pass !== CLAVE_ADMIN) {
-                    alert("Llave incorrecta. Acceso denegado.");
-                    return; // Aborta la operación y se queda en la pantalla actual
-                }
+                if (pass !== CLAVE_ADMIN) { alert("Llave incorrecta. Acceso denegado."); return; }
             }
 
-            activeView = viewId; // Guardar estado de vista autorizado
+            activeView = viewId;
 
             document.querySelectorAll('.view-section').forEach(s => s.classList.replace('block', 'hidden') || s.classList.replace('grid', 'hidden'));
             const target = document.getElementById(`view-${viewId}`);
@@ -472,7 +462,7 @@
             cargarEcosistemaData();
         }
 
-        // === RENDERIZADO: APARTADO DE ANFITRIÓN ===
+        // === RENDERIZADO OPTIMIZADO: PANEL DE ANFITRIÓN ===
         function renderAnfitrionView(mesas, reservas) {
             const fechaFiltroAnfitrion = document.getElementById('anfitrion-date').value;
             const lista = document.getElementById('lista-reservas-anfitrion');
@@ -484,7 +474,7 @@
             const reservasDeEstaFecha = reservas.filter(r => r.fecha === fechaFiltroAnfitrion);
             document.getElementById('badge-count').innerText = `${reservasDeEstaFecha.length} Activas`;
 
-            // 1. Listado Lateral de Reservas del día
+            // 1. Listado Lateral: Flujo de Reservas con doble confirmación integrada
             if (reservasDeEstaFecha.length === 0) {
                 lista.innerHTML = '<p class="text-xs text-gray-500 text-center py-6">No hay reservas para esta fecha.</p>';
             } else {
@@ -509,14 +499,15 @@
                 });
             }
 
-            // 2. Plano Táctil Interactivo
+            // 2. Plano Táctil Interactivo: ÚNICAMENTE Nombre de Mesa, Capacidad, Zona y Nombre del Cliente
             mesas.forEach(m => {
                 const box = document.createElement('div');
                 let estadoVisualCalculado = m.estado;
                 let clienteAsociadoId = 'null';
+                let reservaMatch = null;
 
                 if (estadoVisualCalculado !== 'Deshabilitada') {
-                    const reservaMatch = reservasDeEstaFecha.find(r => r.mesa_numero === m.numero);
+                    reservaMatch = reservasDeEstaFecha.find(r => r.mesa_numero === m.numero);
                     if (reservaMatch) {
                         estadoVisualCalculado = 'Ocupada';
                         clienteAsociadoId = reservaMatch.id || 'null';
@@ -538,26 +529,35 @@
 
                 box.className = `${colorClass} ${cursorStyle} p-3 rounded-xl flex flex-col justify-between h-24 border text-xs`;
 
+                // Construcción limpia con los 4 datos explícitos requeridos
+                const clienteNombreExplicito = reservaMatch ? reservaMatch.cliente_nombre : "Libre";
+
                 box.innerHTML = `
                     <div class="flex justify-between items-start">
                         <span class="font-bold text-base tracking-wider">${m.numero}</span>
-                        <span class="text-[9px] font-semibold uppercase px-1.5 py-0.2 rounded bg-black/10 truncate max-w-[60px]">${m.zona}</span>
+                        <span class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-black/20 truncate max-w-[80px]" title="${m.zona}">${m.zona}</span>
                     </div>
-                    <div class="leading-tight">
-                        <div class="flex justify-between text-[10px] opacity-90">
-                            <span>Cap: ${m.capacidad}p</span>
+                    <div class="leading-tight space-y-1">
+                        <div class="flex justify-between text-[11px] opacity-90">
+                            <span><i class="fa-solid fa-users text-[8px] mr-1"></i>Cap: ${m.capacidad}p</span>
                             <span class="font-bold uppercase tracking-wide text-[9px]">${estadoVisualCalculado === 'Ocupada' ? '⚠️ Ocupada' : 'Libre'}</span>
                         </div>
-                        <span class="font-medium text-[10px] block truncate mt-0.5"><i class="fa-solid fa-user-tie text-[9px] mr-1"></i>${m.mesonero || 'Sin asignar'}</span>
+                        <div class="text-[10px] font-bold bg-black/10 px-1.5 py-1 rounded truncate flex items-center gap-1">
+                            <i class="fa-solid fa-user text-[8px] opacity-70"></i> ${clienteNombreExplicito}
+                        </div>
                     </div>
                 `;
                 plano.appendChild(box);
             });
         }
 
-        // LIBERACIÓN ACTIVA CON FALLBACK DE SEGURIDAD POR FECHA Y MESA
+        // LÓGICA CON SISTEMA DE DOBLE CONFIRMACIÓN DE SEGURIDAD (CONSECUTIVAS)
         async function liberacionMesaDirecta(mesaNumero, reservaId, fechaReserva) {
-            if(!confirm(`¿Deseas levantar la ocupación de la mesa ${mesaNumero} para esta fecha?`)) return;
+            // Primera confirmación obligatoria
+            if(!confirm(`[CONFIRMACIÓN 1 DE 2]\n¿Deseas levantar la ocupación de la mesa ${mesaNumero} para esta fecha?`)) return;
+            
+            // Segunda confirmación estricta de seguridad
+            if(!confirm(`[CONFIRMACIÓN DE SEGURIDAD 2 DE 2]\n¿Estás absolutamente seguro? Esta acción eliminará permanentemente la reserva de la mesa ${mesaNumero} y cambiará su estado a disponible.`)) return;
             
             const fechaActive = fechaReserva || document.getElementById('anfitrion-date').value;
 
