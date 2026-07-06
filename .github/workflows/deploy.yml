@@ -2,15 +2,13 @@ name: Desplegar RestoPub a GitHub Pages
 
 on:
   push:
-    branches: ["main"] # Cambia a "master" si tu rama principal se llama así
+    branches: ["main"]
 
-# AQUÍ ESTÁ EL TRUCO: Permisos obligatorios para que no falle el despliegue
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Evita colisiones si haces muchos pushes seguidos
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -23,15 +21,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 # GitHub gestiona la compatibilidad interna aquí
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
 
       - name: Subir el archivo index.html
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v3 # Esta versión interna ya mitiga el aviso de carga
         with:
-          path: '.' # Sube la raíz del proyecto donde está tu index.html
+          path: '.'
 
       - name: Desplegar a GitHub Pages
         id: deployment
