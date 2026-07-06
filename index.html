@@ -228,10 +228,6 @@
                     <label class="block text-xs text-gray-400 mb-1">Notas Especiales</label>
                     <textarea id="res-notas" rows="2" placeholder="Cumpleaños, detalles..." class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none resize-none"></textarea>
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Notas Especiales</label>
-                    <textarea id="res-notas" rows="2" placeholder="Cumpleaños, detalles..." class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none resize-none"></textarea>
-                </div>
                 <div class="p-3 bg-gray-900/50 rounded-lg border border-gray-700/60 text-xs text-gray-300">
                     Vas a reservar la mesa: <span id="resumen-mesa-id" class="text-emerald-400 font-bold"></span>
                 </div>
@@ -250,9 +246,9 @@
         const CLAVE_ADMIN = "admin123";
         let activeView = "cliente"; 
 
-        // === CREDENCIALES DE SUPABASE AGREGADAS EN SU LUGAR ===
-        const SUPABASE_URL = "https://ucjtnkmmtyumcujbapgc.supabase.co"; // Sin el /rest/v1/ al final
-        const SUPABASE_ANON_KEY = "tu_clave_publishable_default...";
+        // === CREDENCIALES DE SUPABASE COMPLETAMENTE ACTUALIZADAS ===
+        const SUPABASE_URL = "https://ucjtnkmmtyumcujbapgc.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_Thv5zx4E7CZUF6AW_SFCcw_9IJyfZkg";
         
         let db = null;
         let modoLocal = true;
@@ -475,7 +471,8 @@
             };
 
             if (!modoLocal) {
-                await db.from('reservas').insert([nuevaReserva]);
+                const { error } = await db.from('reservas').insert([nuevaReserva]);
+                if(error) { alert("Error de Supabase al reservar: " + error.message); return; }
             } else {
                 let res = JSON.parse(localStorage.getItem('reservas')) || [];
                 nuevaReserva.id = "res-" + Math.random().toString(36).substring(2, 9);
@@ -636,7 +633,7 @@
 
             if (!modoLocal) {
                 const { error } = await db.from('eventos').insert([nuevoEvento]);
-                if(error) alert("Error: Ya existe un evento en esa fecha.");
+                if(error) { alert("Error de Supabase: " + error.message); return; }
             } else {
                 let evs = JSON.parse(localStorage.getItem('eventos')) || [];
                 if (evs.some(e => e.fecha === dateVal)) { alert("Ya hay un evento configurado para ese día."); return; }
@@ -700,7 +697,7 @@
 
             if (!modoLocal) {
                 const { error } = await db.from('mesas').insert([nuevaMesa]);
-                if(error) alert("Error: Identificador de mesa duplicado.");
+                if(error) { alert("Error de Supabase: " + error.message); return; }
             } else {
                 let m = JSON.parse(localStorage.getItem('mesas')) || [];
                 if (m.some(t => t.numero === num)) { alert("Esta identificación de mesa ya existe."); return; }
