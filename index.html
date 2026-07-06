@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Reservas Pro - RestoPub</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
+
+    <!-- NAVEGACIÓN PRINCIPAL -->
+    <nav class="bg-gray-800 border-b border-gray-700 sticky top-0 z-50 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-utensils text-emerald-500 text-2xl"></i>
+                <span class="text-xl font-bold tracking-wider text-white">RestoPub <span class="text-emerald-400 text-xs font-normal">Live DB v1.8</span></span>
+            </div>
+            <!-- Estado de la Conexión -->
+            <div id="db-status" class="text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-full">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i> Modo Local (Configura Supabase)
+            </div>
+            <!-- Selectores de Roles -->
+            <div class="bg-gray-900 p-1 rounded-lg border border-gray-700 flex gap-1">
+                <button onclick="switchView('cliente')" id="btn-cliente" class="view-btn px-4 py-1.5 rounded-md text-sm font-medium bg-emerald-600 text-white transition-all">
+                    <i class="fa-solid fa-user mr-1"></i> Cliente
+                </button>
+                <button onclick="switchView('anfitrion')" id="btn-anfitrion" class="view-btn px-4 py-1.5 rounded-md text-sm font-medium text-gray-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-bell-concierge mr-1"></i> Anfitrión
+                </button>
+                <button onclick="switchView('admin')" id="btn-admin" class="view-btn px-4 py-1.5 rounded-md text-sm font-medium text-gray-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-sliders mr-1"></i> Admin (CRUD)
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- CONTENEDOR DE VISTAS -->
+    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- ==================== VISTA CLIENTE ==================== -->
+        <section id="view-cliente" class="view-section block max-w-md mx-auto bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
+            <div class="p-5 bg-gradient-to-r from-emerald-800 to-emerald-950 border-b border-gray-700 text-center">
+                <h2 class="text-xl font-bold text-white">Reserva tu Mesa</h2>
+                <p class="text-emerald-300 text-xs mt-1">Disponibilidad dinámica calculada según la fecha seleccionada</p>
+            </div>
+            <div class="p-5 space-y-5">
+                <!-- Selector de Fecha y Evento Automatizado -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">Fecha de Visita</label>
+                        <input type="date" id="client-date" value="2026-07-06" onchange="cargarEcosistemaData()" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">Nombre del Evento</label>
+                        <div id="client-evento-nombre" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-emerald-400 font-bold min-h-[38px] flex items-center">
+                            <!-- Inyección dinámica -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Plano de Mesas Disponibles -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>Mesas Libres para esta Fecha:</span>
+                        <span class="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[10px] normal-case"><i class="fa-solid fa-calendar-day mr-1"></i>Filtro de Fecha Activo</span>
+                    </label>
+                    <div id="plano-cliente" class="bg-gray-950 rounded-xl p-4 border border-gray-700 grid grid-cols-2 gap-3 text-center min-h-[150px] items-center justify-center">
+                        <!-- JS inyectará exclusivamente las mesas libres de la fecha elegida -->
+                    </div>
+                </div>
+
+                <button id="btn-abrir-reserva" disabled onclick="toggleModal(true)" class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg">
+                    Reservar Mesa <span id="mesa-seleccionada-txt"></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ==================== VISTA ANFITRIÓN ==================== -->
+        <section id="view-anfitrion" class="view-section hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Flujo activo de reservas -->
+            <div class="lg:col-span-1 bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col h-[550px]">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-arrow-tray-full text-blue-400 mr-2"></i>Flujo de Reservas</h3>
+                    <span id="badge-count" class="bg-blue-500/20 text-blue-400 text-xs px-2.5 py-1 rounded-full font-semibold">0 Activas</span>
+                </div>
+                
+                <!-- Selector de fecha interno para el Anfitrión -->
+                <div class="mb-3">
+                    <label class="block text-[10px] uppercase tracking-wider text-gray-400 mb-1">Monitorear Fecha:</label>
+                    <input type="date" id="anfitrion-date" value="2026-07-06" onchange="cargarEcosistemaData()" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div id="lista-reservas-anfitrion" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                    <!-- JS renderizará las tarjetas de reservas aquí -->
+                </div>
+            </div>
+
+            <!-- Monitor de Piso Interactivo -->
+            <div class="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-map-location-dot text-emerald-400 mr-2"></i>Monitor de Piso (Vista Táctil)</h3>
+                    <div class="text-[11px] text-gray-400 italic"><i class="fa-solid fa-pointer mr-1"></i>Haz clic en una mesa ocupada para liberarla inmediatamente</div>
+                </div>
+                <div id="plano-anfitrion" class="bg-gray-950 border border-gray-700 rounded-xl p-6 grid grid-cols-2 sm:grid-cols-3 gap-4 flex-1 content-start">
+                    <!-- JS renderizará el estado dinámico de la sala según la fecha elegida -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VISTA ADMINISTRADOR ==================== -->
+        <section id="view-admin" class="view-section hidden space-y-6">
+            
+            <!-- PANEL CRUD 1: CONFIGURACIÓN DE EVENTOS -->
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-md">
+                <h3 class="font-bold text-lg text-white mb-4"><i class="fa-solid fa-calendar-star text-emerald-400 mr-2"></i>Configuración de Eventos / Noches</h3>
+                <form id="form-evento" onsubmit="guardarEvento(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Fecha de la Noche</label>
+                        <input type="date" id="evento-fecha" required class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Nombre / Temática del Evento</label>
+                        <input type="text" id="evento-nombre" required placeholder="Ej: Noche de Salsa Baúl" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">
+                        <i class="fa-solid fa-calendar-plus mr-1"></i> Guardar Evento
+                    </button>
+                </form>
+                
+                <div class="mt-4 overflow-x-auto max-h-[150px] overflow-y-auto">
+                    <table class="w-full text-left text-xs text-gray-300">
+                        <thead class="bg-gray-900 sticky top-0 text-gray-400 uppercase">
+                            <tr>
+                                <th class="p-2">Fecha</th>
+                                <th class="p-2">Evento Configurado</th>
+                                <th class="p-2 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-eventos-admin" class="divide-y divide-gray-700/50">
+                            <!-- Inyección dinámica -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PANEL CRUD 2: GESTIÓN DE MESAS -->
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-md">
+                <h3 class="font-bold text-lg text-white mb-4"><i class="fa-solid fa-plus-minus text-emerald-500 mr-2"></i>Gestión e Inventario de Mesas</h3>
+                <form id="form-mesa" onsubmit="guardarMesa(event)" class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Número / Identificación de Mesa</label>
+                        <input type="text" id="mesa-numero" required placeholder="Ej: T4" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Capacidad de Personas</label>
+                        <input type="number" id="mesa-capacidad" required min="1" placeholder="Ej: 4" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Mesonero Asignado</label>
+                        <input type="text" id="mesa-mesonero" required placeholder="Ej: Carlos Mendoza" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Área / Zona del Local</label>
+                        <input type="text" id="mesa-zona" required placeholder="Ej: Terraza, VIP, Barra" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div class="sm:col-span-4 flex justify-end pt-2">
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-6 rounded-lg text-sm transition-colors shadow-md">
+                            <i class="fa-solid fa-floppy-disk mr-1"></i> Guardar Configuración de Mesa
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Inventario de Mesas -->
+            <div class="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-lg">
+                <div class="p-4 border-b border-gray-700 bg-gray-800/50">
+                    <h3 class="font-bold text-base text-white">Inventario Activo de Mesas</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-900/50 text-gray-400 text-xs uppercase">
+                            <tr>
+                                <th class="p-4">Mesa</th>
+                                <th class="p-4">Capacidad</th>
+                                <th class="p-4">Mesonero</th>
+                                <th class="p-4">Área / Zona</th>
+                                <th class="p-4">Estado Base</th>
+                                <th class="p-4 text-right">Acciones de Control</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-mesas-admin" class="divide-y divide-gray-700/60">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ==================== MODAL FORMULARIO RESERVA ==================== -->
+    <div id="modal-reserva" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div class="p-4 bg-emerald-900 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="font-bold text-white text-lg"><i class="fa-solid fa-pen-to-square mr-2"></i>Confirmar Datos de Reserva</h3>
+                <button onclick="toggleModal(false)" class="text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="procesarReserva(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Nombre Solicitante *</label>
+                    <input type="text" id="res-nombre" required placeholder="Ej: Juan Pérez" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Teléfono Móvil *</label>
+                        <input type="tel" id="res-telefono" required placeholder="+569..." class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Asistentes *</label>
+                        <input type="number" id="res-personas" required min="1" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Notas Especiales</label>
+                    <textarea id="res-notas" rows="2" placeholder="Cumpleaños, detalles..." class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none resize-none"></textarea>
+                </div>
+                <div class="p-3 bg-gray-900/50 rounded-lg border border-gray-700/60 text-xs text-gray-300">
+                    Vas a reservar la mesa: <span id="resumen-mesa-id" class="text-emerald-400 font-bold"></span>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="toggleModal(false)" class="w-1/3 bg-gray-700 text-white py-2 rounded-xl text-sm">Regresar</button>
+                    <button type="submit" class="w-2/3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl text-sm shadow-md">Finalizar Registro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== LOGICA DEL SISTEMA ==================== -->
+    <script>
+        // === CONTROLES DE ACCESO / CLAVES DEL SISTEMA ===
+        const CLAVE_ANFITRION = "1234";
+        const CLAVE_ADMIN = "admin123";
+        let activeView = "cliente"; // Rastrear vista actual para fallbacks de denegación
+
+        // === CREDENCIALES DE SUPABASE ===
+        const SUPABASE_URL = "TU_SUPABASE_URL"; 
+        const SUPABASE_ANON_KEY = "TU_SUPABASE_ANON_KEY";
+        
+        let db = null;
+        let modoLocal = true;
+
+        if (SUPABASE_URL !== "TU_SUPABASE_URL" && SUPABASE_ANON_KEY !== "TU_SUPABASE_ANON_KEY") {
+            try {
+                db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                modoLocal = false;
+                document.getElementById('db-status').className = "text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-full";
+                document.getElementById('db-status').innerHTML = '<i class="fa-solid fa-cloud shadow-sm mr-1"></i> Conectado a Supabase';
+            } catch (error) {
+                console.error("Error en conexión Supabase, usando localStorage fallback:", error);
+            }
+        }
+
+        // === LOCAL STORAGE FALLBACK DATA ===
+        if (modoLocal) {
+            if (!localStorage.getItem('mesas')) {
+                localStorage.setItem('mesas', JSON.stringify([
+                    {id: "1", numero: 'T1', capacidad: 2, zona: 'Terraza', mesonero: 'Juan Pérez', estado: 'Disponible'},
+                    {id: "2", numero: 'T2', capacidad: 4, zona: 'Terraza', mesonero: 'Juan Pérez', estado: 'Disponible'},
+                    {id: "3", numero: 'I1', capacidad: 4, zona: 'Interior', mesonero: 'Andrés Silva', estado: 'Disponible'},
+                    {id: "4", numero: 'I2', capacidad: 3, zona: 'Interior', mesonero: 'Andrés Silva', estado: 'Disponible'},
+                    {id: "5", numero: 'VIP-1', capacidad: 6, zona: 'VIP Lounge', mesonero: 'Pedro Gómez', estado: 'Deshabilitada'}
+                ]));
+            }
+            if (!localStorage.getItem('reservas')) {
+                localStorage.setItem('reservas', JSON.stringify([
+                    {id: "res-initial", cliente_nombre: "Mariano Elorza", cliente_telefono: "+5841200000", numero_personas: 4, mesa_numero: "T2", fecha: "2026-07-06", evento_nombre: "Noche de Salsa Baúl", codigo_confirmacion: "RES-MOCK", estado: "Confirmada"}
+                ]));
+            }
+            if (!localStorage.getItem('eventos')) {
+                localStorage.setItem('eventos', JSON.stringify([
+                    {id: "e1", fecha: "2026-07-06", nombre: "Noche de Salsa Baúl"},
+                    {id: "e2", fecha: "2026-07-07", nombre: "Electronic Session Vol. 1"}
+                ]));
+            }
+        }
+
+        let mesaSeleccionada = null;
+        let eventoActualCliente = "Noche Regular (Abierto)";
+
+        window.onload = () => {
+            document.getElementById('anfitrion-date').value = document.getElementById('client-date').value;
+            cargarEcosistemaData();
+        };
+
+        async function cargarEcosistemaData() {
+            const mesas = await getMesas();
+            const reservas = await getReservas();
+            const eventos = await getEventos();
+            
+            buscarEventoParaCliente(eventos);
+            renderPlanoCliente(mesas, reservas);
+            renderAnfitrionView(mesas, reservas);
+            renderAdminTable(mesas);
+            renderAdminEventos(eventos);
+        }
+
+        // === CAPA DE CAPTURA CON ORDENAMIENTO ASCENDENTE AUTOMÁTICO ===
+        async function getMesas() {
+            if (!modoLocal) {
+                let { data } = await db.from('mesas').select('*').order('numero', { ascending: true });
+                return data || [];
+            }
+            let raw = JSON.parse(localStorage.getItem('mesas')) || [];
+            return raw.sort((a, b) => a.numero.localeCompare(b.numero, undefined, { numeric: true, sensitivity: 'base' }));
+        }
+
+        async function getReservas() {
+            if (!modoLocal) {
+                let { data } = await db.from('reservas').select('*').order('created_at', { ascending: false });
+                return data || [];
+            }
+            return JSON.parse(localStorage.getItem('reservas')) || [];
+        }
+
+        async function getEventos() {
+            if (!modoLocal) {
+                let { data } = await db.from('eventos').select('*').order('fecha', { ascending: true });
+                return data || [];
+            }
+            let raw = JSON.parse(localStorage.getItem('eventos')) || [];
+            return raw.sort((a, b) => a.fecha.localeCompare(b.fecha));
+        }
+
+        // === AUTOMATIZACIÓN DE EVENTOS EN PANEL CLIENTE ===
+        async function buscarEventoParaCliente(eventosPrecargados) {
+            const fechaSeleccionada = document.getElementById('client-date').value;
+            const listaEventos = eventosPrecargados || await getEventos();
+            const eventoEncontrado = listaEventos.find(ev => ev.fecha === fechaSeleccionada);
+            
+            if (eventoEncontrado) {
+                eventoActualCliente = eventoEncontrado.nombre;
+                document.getElementById('client-evento-nombre').innerText = eventoEncontrado.nombre;
+                document.getElementById('client-evento-nombre').className = "w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-emerald-400 font-bold min-h-[38px] flex items-center";
+            } else {
+                eventoActualCliente = "Noche Regular (Abierto)";
+                document.getElementById('client-evento-nombre').innerText = "Noche General";
+                document.getElementById('client-evento-nombre').className = "w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-gray-400 italic min-h-[38px] flex items-center";
+            }
+        }
+
+        // CONTROLADOR DE CAMBIO DE ENTORNOS CON VERIFICACIÓN DE CLAVES
+        function switchView(viewId) {
+            // Validar clave para Anfitrión
+            if (viewId === 'anfitrion') {
+                let pass = prompt("Ingrese la clave de seguridad para el entorno de Anfitrión:");
+                if (pass !== CLAVE_ANFITRION) {
+                    alert("Llave incorrecta. Acceso denegado.");
+                    return; // Aborta la operación y se queda en la pantalla actual
+                }
+            }
+
+            // Validar clave para Administrador
+            if (viewId === 'admin') {
+                let pass = prompt("Ingrese la clave de seguridad de Administrador (CRUD):");
+                if (pass !== CLAVE_ADMIN) {
+                    alert("Llave incorrecta. Acceso denegado.");
+                    return; // Aborta la operación y se queda en la pantalla actual
+                }
+            }
+
+            activeView = viewId; // Guardar estado de vista autorizado
+
+            document.querySelectorAll('.view-section').forEach(s => s.classList.replace('block', 'hidden') || s.classList.replace('grid', 'hidden'));
+            const target = document.getElementById(`view-${viewId}`);
+            viewId === 'anfitrion' ? target.classList.replace('hidden', 'grid') : target.classList.replace('hidden', 'block');
+
+            document.querySelectorAll('.view-btn').forEach(b => b.className = "view-btn px-4 py-1.5 rounded-md text-sm font-medium text-gray-400 hover:text-white transition-all");
+            const activeBtn = document.getElementById(`btn-${viewId}`);
+            if(viewId === 'cliente') activeBtn.classList.add('bg-emerald-600', 'text-white');
+            if(viewId === 'anfitrion') activeBtn.classList.add('bg-blue-600', 'text-white');
+            if(viewId === 'admin') activeBtn.classList.add('bg-gray-700', 'text-white');
+            
+            if (viewId === 'anfitrion') {
+                document.getElementById('anfitrion-date').value = document.getElementById('client-date').value;
+            }
+            cargarEcosistemaData();
+        }
+
+        // === RENDERIZADO: CLIENTE ===
+        function renderPlanoCliente(mesas, reservas) {
+            const fechaSeleccionada = document.getElementById('client-date').value;
+            const contenedor = document.getElementById('plano-cliente');
+            contenedor.innerHTML = '';
+            
+            const mesasHabilitadas = mesas.filter(m => m.estado !== 'Deshabilitada');
+
+            const mesasReservadasEnEstaFecha = reservas
+                .filter(r => r.fecha === fechaSeleccionada)
+                .map(r => r.mesa_numero);
+
+            const mesasDisponibles = mesasHabilitadas.filter(m => !mesasReservadasEnEstaFecha.includes(m.numero));
+
+            if(mesasDisponibles.length === 0) {
+                contenedor.innerHTML = `
+                    <div class="col-span-2 text-center py-8 text-gray-400 text-xs">
+                        <i class="fa-solid fa-circle-xmark text-red-400 text-2xl mb-2 block"></i>
+                        No quedan mesas disponibles para la fecha seleccionada.
+                    </div>`;
+                return;
+            }
+
+            mesasDisponibles.forEach(m => {
+                const btn = document.createElement('button');
+                btn.className = `p-4 bg-emerald-500 text-gray-950 hover:bg-emerald-400 active:scale-95 font-bold rounded-xl text-sm flex flex-col items-center justify-center shadow-lg border border-emerald-400/30 transition-all duration-150`;
+                btn.onclick = () => selectMesaCliente(m.numero, m.capacidad);
+                
+                btn.innerHTML = `
+                    <span class="text-base tracking-wider">${m.numero}</span>
+                    <span class="text-[10px] font-medium bg-black/10 px-2 py-0.5 rounded mt-1.5 opacity-90">
+                        <i class="fa-solid fa-users text-[8px] mr-1"></i>${m.capacidad} Pers.
+                    </span>
+                `;
+                contenedor.appendChild(btn);
+            });
+        }
+
+        function selectMesaCliente(numeroMesa, capacidad) {
+            mesaSeleccionada = numeroMesa;
+            document.getElementById('mesa-seleccionada-txt').innerText = `(${numeroMesa})`;
+            document.getElementById('resumen-mesa-id').innerText = `${numeroMesa} (Máx: ${capacidad} personas)`;
+            document.getElementById('res-personas').max = capacidad;
+            document.getElementById('btn-abrir-reserva').removeAttribute('disabled');
+        }
+
+        function toggleModal(show) {
+            document.getElementById('modal-reserva').classList.toggle('hidden', !show);
+        }
+
+        async function procesarReserva(e) {
+            e.preventDefault();
+            const nuevaReserva = {
+                cliente_nombre: document.getElementById('res-nombre').value,
+                cliente_telefono: document.getElementById('res-telefono').value,
+                cliente_email: null,
+                numero_personas: parseInt(document.getElementById('res-personas').value),
+                mesa_numero: mesaSeleccionada,
+                fecha: document.getElementById('client-date').value,
+                evento_nombre: eventoActualCliente,
+                codigo_confirmacion: "RES-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+                estado: 'Confirmada'
+            };
+
+            if (!modoLocal) {
+                await db.from('reservas').insert([nuevaReserva]);
+            } else {
+                let res = JSON.parse(localStorage.getItem('reservas')) || [];
+                nuevaReserva.id = "res-" + Math.random().toString(36).substring(2, 9);
+                res.push(nuevaReserva);
+                localStorage.setItem('reservas', JSON.stringify(res));
+            }
+
+            alert(`¡Reserva Procesada!\nMesa: ${mesaSeleccionada}\nCódigo: ${nuevaReserva.codigo_confirmacion}`);
+            toggleModal(false);
+            e.target.reset();
+            mesaSeleccionada = null;
+            document.getElementById('btn-abrir-reserva').setAttribute('disabled', 'true');
+            document.getElementById('mesa-seleccionada-txt').innerText = '';
+            cargarEcosistemaData();
+        }
+
+        // === RENDERIZADO: APARTADO DE ANFITRIÓN ===
+        function renderAnfitrionView(mesas, reservas) {
+            const fechaFiltroAnfitrion = document.getElementById('anfitrion-date').value;
+            const lista = document.getElementById('lista-reservas-anfitrion');
+            const plano = document.getElementById('plano-anfitrion');
+            
+            lista.innerHTML = '';
+            plano.innerHTML = '';
+            
+            const reservasDeEstaFecha = reservas.filter(r => r.fecha === fechaFiltroAnfitrion);
+            document.getElementById('badge-count').innerText = `${reservasDeEstaFecha.length} Activas`;
+
+            // 1. Listado Lateral de Reservas del día
+            if (reservasDeEstaFecha.length === 0) {
+                lista.innerHTML = '<p class="text-xs text-gray-500 text-center py-6">No hay reservas para esta fecha.</p>';
+            } else {
+                reservasDeEstaFecha.forEach(r => {
+                    const d = document.createElement('div');
+                    d.className = "bg-gray-900 border-l-4 border-blue-500 p-3 rounded-r-lg border border-y-gray-700 border-r-gray-700 flex justify-between items-center text-xs shadow-sm";
+                    
+                    const nombreEventoSeguro = r.evento_nombre || r.turno || 'Noche General';
+                    const idReservaSeguro = r.id || 'null';
+
+                    d.innerHTML = `
+                        <div class="space-y-0.5 max-w-[65%]">
+                            <p class="font-bold text-white truncate">${r.cliente_nombre} <span class="text-blue-400 font-normal">[Mesa ${r.mesa_numero}]</span></p>
+                            <p class="text-[10px] text-emerald-400 font-semibold truncate">${nombreEventoSeguro}</p>
+                            <p class="text-[10px] text-gray-400"><i class="fa-solid fa-users text-[8px] mr-1"></i>${r.numero_personas} pers. | ${r.cliente_telefono}</p>
+                        </div>
+                        <button onclick="liberacionMesaDirecta('${r.mesa_numero}', '${idReservaSeguro}', '${fechaFiltroAnfitrion}')" class="bg-red-600/20 hover:bg-red-600 border border-red-500/30 text-red-400 hover:text-white transition-all text-[10px] py-1.5 px-3 font-bold rounded-lg flex items-center gap-1">
+                            <i class="fa-solid fa-door-open"></i> Liberar
+                        </button>
+                    `;
+                    lista.appendChild(d);
+                });
+            }
+
+            // 2. Plano Táctil Interactivo
+            mesas.forEach(m => {
+                const box = document.createElement('div');
+                let estadoVisualCalculado = m.estado;
+                let clienteAsociadoId = 'null';
+
+                if (estadoVisualCalculado !== 'Deshabilitada') {
+                    const reservaMatch = reservasDeEstaFecha.find(r => r.mesa_numero === m.numero);
+                    if (reservaMatch) {
+                        estadoVisualCalculado = 'Ocupada';
+                        clienteAsociadoId = reservaMatch.id || 'null';
+                    }
+                }
+
+                let colorClass = "";
+                let cursorStyle = "cursor-default";
+
+                if (estadoVisualCalculado === 'Disponible') {
+                    colorClass = 'bg-green-500 border-green-400 text-gray-950';
+                } else if (estadoVisualCalculado === 'Deshabilitada') {
+                    colorClass = 'bg-gray-600 border-gray-500 text-gray-300 opacity-60';
+                } else {
+                    colorClass = 'bg-red-500 border-red-400 text-white hover:bg-red-600 transition-colors shadow-md';
+                    cursorStyle = "cursor-pointer active:scale-95 transition-transform";
+                    box.setAttribute('onclick', `liberacionMesaDirecta('${m.numero}', '${clienteAsociadoId}', '${fechaFiltroAnfitrion}')`);
+                }
+
+                box.className = `${colorClass} ${cursorStyle} p-3 rounded-xl flex flex-col justify-between h-24 border text-xs`;
+
+                box.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <span class="font-bold text-base tracking-wider">${m.numero}</span>
+                        <span class="text-[9px] font-semibold uppercase px-1.5 py-0.2 rounded bg-black/10 truncate max-w-[60px]">${m.zona}</span>
+                    </div>
+                    <div class="leading-tight">
+                        <div class="flex justify-between text-[10px] opacity-90">
+                            <span>Cap: ${m.capacidad}p</span>
+                            <span class="font-bold uppercase tracking-wide text-[9px]">${estadoVisualCalculado === 'Ocupada' ? '⚠️ Ocupada' : 'Libre'}</span>
+                        </div>
+                        <span class="font-medium text-[10px] block truncate mt-0.5"><i class="fa-solid fa-user-tie text-[9px] mr-1"></i>${m.mesonero || 'Sin asignar'}</span>
+                    </div>
+                `;
+                plano.appendChild(box);
+            });
+        }
+
+        // LIBERACIÓN ACTIVA CON FALLBACK DE SEGURIDAD POR FECHA Y MESA
+        async function liberacionMesaDirecta(mesaNumero, reservaId, fechaReserva) {
+            if(!confirm(`¿Deseas levantar la ocupación de la mesa ${mesaNumero} para esta fecha?`)) return;
+            
+            const fechaActive = fechaReserva || document.getElementById('anfitrion-date').value;
+
+            if (!modoLocal) {
+                if(reservaId && reservaId !== 'null' && reservaId !== 'undefined') {
+                    await db.from('reservas').delete().eq('id', reservaId);
+                } else {
+                    await db.from('reservas').delete().eq('mesa_numero', mesaNumero).eq('fecha', fechaActive);
+                }
+            } else {
+                let res = JSON.parse(localStorage.getItem('reservas')) || [];
+                
+                res = res.filter(r => {
+                    const esMismoId = (reservaId && reservaId !== 'null' && r.id === reservaId);
+                    const esMismaMesaFecha = (r.mesa_numero === mesaNumero && r.fecha === fechaActive);
+                    return !(esMismoId || esMismaMesaFecha);
+                });
+                
+                localStorage.setItem('reservas', JSON.stringify(res));
+            }
+            cargarEcosistemaData();
+        }
+
+        // === CRUD: EVENTOS (ADMINISTRADOR) ===
+        function renderAdminEventos(eventos) {
+            const tbody = document.getElementById('lista-eventos-admin');
+            tbody.innerHTML = '';
+            
+            if(eventos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="p-2 text-center text-gray-500">No hay eventos configurados.</td></tr>';
+                return;
+            }
+
+            eventos.forEach(ev => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-700/40 hover:bg-gray-700/10";
+                tr.innerHTML = `
+                    <td class="p-2 text-gray-300 font-mono">${ev.fecha}</td>
+                    <td class="p-2 text-white font-semibold">${ev.nombre}</td>
+                    <td class="p-2 text-right">
+                        <button onclick="eliminarEvento('${ev.id}', '${ev.fecha}')" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function guardarEvento(e) {
+            e.preventDefault();
+            const dateVal = document.getElementById('evento-fecha').value;
+            const nameVal = document.getElementById('evento-nombre').value.trim();
+            const nuevoEvento = { fecha: dateVal, nombre: nameVal };
+
+            if (!modoLocal) {
+                const { error } = await db.from('eventos').insert([nuevoEvento]);
+                if(error) alert("Error: Ya existe un evento en esa fecha.");
+            } else {
+                let evs = JSON.parse(localStorage.getItem('eventos')) || [];
+                if (evs.some(e => e.fecha === dateVal)) { alert("Ya hay un evento configurado para ese día."); return; }
+                nuevoEvento.id = "ev-" + Math.random().toString(36).substring(2, 9);
+                evs.push(nuevoEvento);
+                localStorage.setItem('eventos', JSON.stringify(evs));
+            }
+
+            e.target.reset();
+            cargarEcosistemaData();
+        }
+
+        async function eliminarEvento(id, fecha) {
+            if(!confirm(`¿Remover el evento de la fecha ${fecha}?`)) return;
+            if (!modoLocal) {
+                await db.from('eventos').delete().eq('id', id);
+            } else {
+                let evs = JSON.parse(localStorage.getItem('eventos')) || [];
+                evs = evs.filter(e => e.id !== id);
+                localStorage.setItem('eventos', JSON.stringify(evs));
+            }
+            cargarEcosistemaData();
+        }
+
+        // === CRUD: MESAS (ADMINISTRADOR) ===
+        function renderAdminTable(mesas) {
+            const tbody = document.getElementById('tabla-mesas-admin');
+            tbody.innerHTML = '';
+
+            mesas.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-700/60 hover:bg-gray-700/20 text-xs sm:text-sm";
+                
+                const badgeColor = m.estado === 'Disponible' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-500/10 text-gray-400 border border-gray-500/20';
+                const actionButtonLabel = m.estado === 'Deshabilitada' ? '<i class="fa-solid fa-circle-check mr-1"></i> Habilitar' : '<i class="fa-solid fa-circle-minus mr-1"></i> Deshabilitar';
+                const actionButtonClass = m.estado === 'Deshabilitada' ? 'bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-500/30' : 'bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 border border-yellow-500/30';
+
+                tr.innerHTML = `
+                    <td class="p-4 font-bold text-white">${m.numero}</td>
+                    <td class="p-4 text-gray-300">${m.capacidad} Personas</td>
+                    <td class="p-4 text-gray-300 font-medium"><i class="fa-solid fa-user-tie text-gray-500 mr-1.5"></i>${m.mesonero || 'Sin asignar'}</td>
+                    <td class="p-4 text-gray-400 font-semibold">${m.zona}</td>
+                    <td class="p-4"><span class="px-2.5 py-1 rounded-md font-semibold ${badgeColor}">${m.estado === 'Disponible' ? 'Habilitada' : m.estado}</span></td>
+                    <td class="p-4 text-right space-x-1 whitespace-nowrap">
+                        <button onclick="toggleHabilitarMesa('${m.id}', '${m.estado}')" class="${actionButtonClass} px-3 py-1.5 rounded-lg font-medium text-xs transition-all">${actionButtonLabel}</button>
+                        <button onclick="eliminarMesa('${m.id}', '${m.numero}')" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 p-2 rounded-lg text-xs" title="Eliminar Mesa"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function guardarMesa(e) {
+            e.preventDefault();
+            const num = document.getElementById('mesa-numero').value.toUpperCase().trim();
+            const cap = parseInt(document.getElementById('mesa-capacidad').value);
+            const mes = document.getElementById('mesa-mesonero').value.trim();
+            const zon = document.getElementById('mesa-zona').value.trim();
+
+            const nuevaMesa = { numero: num, capacidad: cap, mesonero: mes, zona: zon, estado: 'Disponible' };
+
+            if (!modoLocal) {
+                const { error } = await db.from('mesas').insert([nuevaMesa]);
+                if(error) alert("Error: Identificador de mesa duplicado.");
+            } else {
+                let m = JSON.parse(localStorage.getItem('mesas')) || [];
+                if (m.some(t => t.numero === num)) { alert("Esta identificación de mesa ya existe."); return; }
+                nuevaMesa.id = "table-" + Math.random().toString(36).substring(2, 9);
+                m.push(nuevaMesa);
+                localStorage.setItem('mesas', JSON.stringify(m));
+            }
+
+            e.target.reset();
+            cargarEcosistemaData();
+        }
+
+        async function toggleHabilitarMesa(id, estadoActual) {
+            const nuevoEstado = estadoActual === "Deshabilitada" ? "Disponible" : "Deshabilitada";
+            
+            if (!modoLocal) {
+                await db.from('mesas').update({ estado: nuevoEstado }).eq('id', id);
+            } else {
+                let m = JSON.parse(localStorage.getItem('mesas')) || [];
+                let i = m.findIndex(t => t.id === id);
+                if(i !== -1) m[i].estado = nuevoEstado;
+                localStorage.setItem('mesas', JSON.stringify(m));
+            }
+            cargarEcosistemaData();
+        }
+
+        async function eliminarMesa(id, numero) {
+            if(!confirm(`¿Deseas eliminar permanentemente la mesa ${numero}?`)) return;
+            if (!modoLocal) {
+                await db.from('mesas').delete().eq('id', id);
+            } else {
+                let m = JSON.parse(localStorage.getItem('mesas')) || [];
+                m = m.filter(t => t.id !== id);
+                localStorage.setItem('mesas', JSON.stringify(m));
+            }
+            cargarEcosistemaData();
+        }
+    </script>
+</body>
+</html>
